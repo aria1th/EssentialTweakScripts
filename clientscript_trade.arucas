@@ -1,0 +1,116 @@
+client = getMinecraftClient();
+player = client.getPlayer();
+world = client.getWorld();
+fun showSuccess() {
+player.messageActionBar("A");
+sleep(100000);
+}
+fun showMsg(msg, time) {
+player.messageActionBar(msg);
+sleep(time);
+}
+
+
+bx = 64;
+by = 5;
+bz = -34;
+
+
+
+refMap = {"fortune" : {0:3, 1:12},
+"mending" :{0:1, 1:12},
+"unbreaking" : {0:3, 1:17},
+"aqua_affinity" : {0:1, 1:7},
+"blast_protection" : {0:4, 1:15},
+"depth_strider" : {0:3, 1:12},
+"feather_falling" : {0:4, 1:15},
+"frost_walker" : {0:1, 1:16},
+"protection" : {0:4, 1:15},
+"respiration" : {0:3, 1:15},
+"thorns" : {0:3, 1:15},
+"efficiency" : {0:5, 1:26},
+"sharpness" : {0:5, 1:20},
+"smite" : {0:5, 1:25},
+"sweeping_edge" : {0:3, 1:15},
+"channeling" : {0:1, 1:20},
+"flame" : {0:1, 1:10},
+"infinity" : {0:1, 1:5},
+"loyalty" : {0:3, 1:20},
+"riptide" : {0:3, 1:20},
+"multishot" : {0:1, 1:20},
+"piercing" : {0:4, 1:25},
+"power" : {0:5, 1:17},
+"punch" : {0:2, 1:12},
+"quick_charge" : {0:3, 1:17},
+"luck_of_the_sea" : {0:3, 1:17},
+"lure" : {0:3, 1:17},
+"silk_touch" : {0:1, 1:5}
+};
+
+mapFor = refMap;
+
+fun placeBlock(){
+while (true){
+if (world.getBlockAt(bx,by,bz).getBlockId()=='lectern'){
+return true;}
+player.setSelectedSlot(4);
+player.placeAt(bx,by,bz);
+sleep(100);
+}
+}
+isWanted = false;
+while (true){
+player.setSneaking(false);
+placeBlock();
+sleep(200);
+while (player.getCurrentScreen() == null){
+allEntities = client.getWorld().getAllEntities();
+foreach (entity : allEntities) {
+    if (entity.getEntityType() == "villager" && player.getSquaredDistanceTo(entity) < 5) {
+        player.interactWithEntity(entity);
+    }
+}
+sleep(100);}
+
+index = player.getIndexOfTradeItem(client.itemFromString("enchanted_book"));
+if (index == null){
+player.closeScreen();
+player.setSelectedSlot(1);
+player.setSneaking(true);
+sleep(200);
+while (world.getBlockAt(bx,by,bz).getBlockId() == 'lectern'){
+player.setSneaking(true);
+player.updateBreakingBlock(bx,by,bz);
+sleep(50);}
+
+continue;
+}
+else {
+sleep(100);
+item = player.getTradeItemForIndex(index);
+value = player.getPriceForIndex(index);
+enchant = item.getEnchantments();
+foreach (keys : enchant.getKeys()) {
+val = enchant.get(keys);
+mapval = mapFor.get(keys);
+if (mapval == null){
+isWanted = false;
+break;}
+if (val >= mapval.get(0) && value <= mapval.get(1)){isWanted = true;break;} else {isWanted = false;}
+}
+}
+if (isWanted != true){
+//break
+player.closeScreen();
+player.setSelectedSlot(1);
+
+player.setSneaking(true);
+while (world.getBlockAt(bx,by,bz).getBlockId() == 'lectern'){
+player.setSneaking(true);
+player.updateBreakingBlock(bx,by,bz);
+sleep(50);}
+
+//break
+}else{stop();}}
+
+

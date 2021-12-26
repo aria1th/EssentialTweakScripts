@@ -1,0 +1,126 @@
+client = getMinecraftClient();
+player = client.getPlayer();
+world = client.getWorld();
+
+//north +z south -z east +x west -x
+fun defRequiredOffset(dir){
+if (dir.uppercase() == 'NORTH'){
+return [0,0,1];
+}
+if (dir.uppercase() == 'SOUTH'){
+return [0,0,-1];
+}
+if (dir.uppercase() == 'EAST'){
+return [1,0,0];
+}
+if (dir.uppercase() == 'WEST'){
+return [-1,0,0];
+}
+return [0,0,0];
+}
+fun breakBlock(x,y,z,maxInterval){
+i=0;
+while (true){
+player.updateBreakingBlock(x,y,z);
+i= i+1;
+if (i>maxInterval){break;}
+}
+}
+
+fun breakBlockNotInstant(x,y,z){
+while (!world.getBlockAt(x,y,z).getBlockId().containsString('air')){
+player.updateBreakingBlock(x,y,z);
+sleep(50);}
+}
+fun placeBlock(x,y,z,itemStack,useSlot, Direction) {
+item = client.itemFromString(itemStack);
+slotlist = player.getAllSlotsFor(item);
+slotnum = null;
+foreach (slots : slotlist) {
+if (0<= slots-36 && slots-36<= 8) {player.setSelectedSlot(slots-36);sleep(1);
+slotnum = slots;
+break;
+}}
+if (slotnum == null) {return false;}
+if (Direction == null) {player.placeAt(x,y,z);} else {player.placeAtWithDirection(x,y,z, Direction);}
+return true;
+//if (useSlot != slotnum){player.swapSlots(useSlot,slotnum);}
+//player.setSelectedSlot(useSlot);
+//if (Direction == null) {player.placeAt(x,y,z);} else {player.placeAtWithDirection(x,y,z, Direction);}
+//return true;
+}
+
+fun breakBedrock(x,y,z, dir) {
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+player.setSelectedSlot(0);
+sleep(1);
+breakBlock(x+2*a,y+2*b,z+2*c,1);
+sleep(1);
+breakBlock(x+a,y+b,z+c,1);
+sleep(1);
+placeBlock(x+a,y+b,z+c,"piston",1,dir);
+sleep(1);
+placeBlock(x+2*a,y+2*b,z+2*c,"redstone_block",2,null);
+}
+
+fun placeBlockAgain(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+placeBlock(x+a,y+b,z+c,"piston", 1, "UP");
+sleep(1);
+placeBlock(x+2*a,y+2*b,z+2*c,"redstone_torch", 2, null);
+sleep(1);
+}
+
+fun clean(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+player.setSelectedSlot(0);
+sleep(5);
+breakBlock(x+a,y+b,z+c,5);
+sleep(5);
+ breakBlockNotInstant(x+2*a,y+2*b,z+2*c);
+sleep(5);
+}
+
+fun isPlaceSuccess(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+return world.getBlockAt(x+a,y+b,z+c).getBlockId() == 'piston' && world.getBlockAt(x+2*a,y+2*b,z+2*c).getBlockId() == 'redstone_torch';
+}
+fun isProcessSuccess(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+prop = world.getBlockAt(x+a,y+b,z+c).getBlockProperties();
+return world.getBlockAt(x+a,y+b,z+c).getBlockId() == 'piston' && prop.get('extended') == true && prop.get('facing') == dir&& world.getBlockAt(x+2*a,y+2*b,z+2*c).getBlockId() == 'redstone_block' && world.getBlockAt(x,y,z).getBlockId() == 'obsidian';
+}
+fun isProgress(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+return world.getBlockAt(x+2*a,y+2*b,z+2*c).getBlockId() == 'redstone_block';
+}
+// headPos xyz, headFacing dir
+fun makeHeadlessPistons(x,y,z, dir){
+abc = defRequiredOffset(dir);a = abc.getIndex(0);b = abc.getIndex(1);c = abc.getIndex(2);
+placeBlock(x+a,y+b,z+c,"obsidian",4,null);
+player.look(0,90);
+sleep(50);
+x = x+a;
+y = y+b;
+z = z+c;
+while (true){
+player.updateBreakingBlock(x,y,z);
+while (!isProgress(x,y,z, dir)){
+breakBedrock(x,y,z, dir);
+sleep(500);}
+
+if (isProcessSuccess(x,y,z, dir)){break;}
+clean(x,y,z, dir);
+sleep(100);
+while (!isPlaceSuccess(x,y,z, dir)){
+placeBlockAgain(x,y,z, dir);
+sleep(200);}
+}
+}
+xL = [94,95,96,97,98,99];
+yi= 8;
+zi = 224;
+foreach (xi : xL){
+makeHeadlessPistons(xi,yi,zi, "north");	
+}
+
