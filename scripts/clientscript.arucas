@@ -1,0 +1,779 @@
+client = getMinecraftClient();
+player = client.getPlayer();
+world = client.getWorld();
+
+accurateBlockPlacementEnabled =true;
+replace = true;
+doSleep = true;
+sleepAmount = 100;
+
+mapBlockRef = {
+	1 : "white_concrete",
+	2 : "sticky_piston",
+	3 : "note_block",
+	4 : "powered_rail",
+	5 : "repeater",
+	6 : "white_stained_glass",
+	7 : "iron_trapdoor",
+	8 : "air"
+};
+mapPropertyRef = {
+	1 : false,
+	2 : false,
+	3 : false,
+	4 : false,
+	5 : false,
+	6 : false,
+	7 : true,
+	8 : false
+};
+
+fun getConvertedPistonVec(direction){
+if (direction.uppercase() == "NORTH"){
+return [0,0,1];}
+if (direction.uppercase() == "SOUTH"){
+return [0,0,-1];}
+if (direction.uppercase() == "EAST"){
+return [-1,0,0];}
+if (direction.uppercase() == "WEST"){
+return [1,0,0];}
+if (direction.uppercase() == "UP"){
+return [0,-1,0];}
+if (direction.uppercase() == "DOWN"){
+return [0,1,0];}
+}
+fun getReverse(dir) {
+dir = dir.uppercase();
+if (dir == "UP") {
+return "DOWN";
+}
+if (dir == "DOWN") {
+return "UP";
+}
+if (dir == "EAST") {
+return "WEST";
+}
+if (dir == "WEST") {
+return "EAST";
+}
+if (dir == "NORTH") {
+return "SOUTH";
+}
+if (dir == "SOUTH") {
+return "NORTH";
+}
+}
+
+fun getDirectionId(dir) {
+dir = dir.uppercase();
+if (dir == "UP") {
+return 1;
+}
+if (dir == "DOWN") {
+return 0;
+}
+if (dir == "EAST") {
+return 5;
+}
+if (dir == "WEST") {
+return 4;
+}
+if (dir == "NORTH") {
+return 2;
+}
+if (dir == "SOUTH") {
+return 3;
+}
+}
+
+
+fun convertHotbarIndexToSlot(ind){
+if (ind == 0){return 46;}
+if (ind < 9) {return ind.modulus(9)+36;}
+return null;
+}
+
+fun getSwappableHotbarSlot(){
+i=0;
+Slot = player.getCurrentSlot();
+while (i<9){
+itemStack = player.getItemForPlayerSlot((Slot+i).modulus(9));
+if (itemStack.getCount() == 0){
+return (Slot+i).modulus(9);}
+i = i+1;
+}
+while (i<9){
+itemStack = player.getItemForPlayerSlot((Slot+i).modulus(9));
+if (itemStack.getEnchantments().isEmpty()){
+return (Slot+i).modulus(9);}
+i = i+1;
+}
+return Slot;
+}
+fun swapToPickaxe(){
+	slot = player.getSlotFor(client.itemFromString("diamond_pickaxe"));
+	if (slot == null) {
+		slot = player.getSlotFor(client.itemFromString("netherite_pickaxe"));
+		}
+	if (slot != null) {
+		if (0 <= slot-36 && slot-36  <= 8) {
+		player.setSelectedSlot(slot-36);
+		return true;
+		} else {
+			preslot = getSwappableHotbarSlot();
+			player.swapPlayerSlotWithHotbar(slot);
+			player.setSelectedSlot(preslot);
+			}
+	}
+}
+fun swapToItem(itemString, dummySlot){
+	if (itemString == "air") {
+		swapToPickaxe();
+		return false;}
+	slot = player.getSlotFor(client.itemFromString(itemString));
+	retVal = false;
+	if (slot == null) {return false;}
+	if (player.getItemForSlot(slot).getCount() == 1) {retVal = true;}
+	if (slot != null) {
+		if (0 <= slot-36 && slot-36  <= 8) {
+		player.setSelectedSlot(slot-36);
+		return retVal;
+		} else {
+			preslot = getSwappableHotbarSlot();
+			player.swapPlayerSlotWithHotbar(slot);
+			player.setSelectedSlot(preslot);
+			return retVal ;
+			}
+	}
+	return null;
+}
+
+fun breakBlockInstant(x,y,z,requireSneak){
+if (requireSneak) {player.setSneaking(true);}
+player.attackBlock(x,y,z,"up");
+return true;
+}
+
+fun breakBlock(x,y,z, requireSneak){
+	if (world.getBlockAt(x,y,z).getHardness() == -1 || world.getBlockAt(x,y,z).isFluid() || world.isAir(x,y,z)) {return;}
+	if (world.getBlockAt(x,y,z).getHardness() == 0) {breakBlockInstant(x,y,z,requireSneak);sleep(20);return;}
+	if (!world.getBlockAt(x,y,z).isReplaceable() ) {swapToPickaxe();}
+	while(!world.getBlockAt(x,y,z).isReplaceable()) {
+		if (requireSneak) {player.setSneaking(true);}
+		player.updateBreakingBlock(x,y,z);
+		sleep(50);
+	}
+	sleep(100);
+}
+
+fun applyCarpetProtocol(x,y,z,direction){
+	dirId = getDirectionId(direction);
+	if (direction == null) {return [x,y,z];}
+	return [x+2*dirId + 2, y, z];
+}
+fun placeTorch(x,y,z,dummySlot, ignoreBlock){
+if (!world.getBlockAt(x,y-1,z).sideCoversSmallSquare("up")){return false;}
+if (!ignoreBlock &&!world.getBlockAt(x,y,z).isReplaceable()){breakBlock(x,y,z,false);}
+swapToItem('redstone_torch',dummySlot);
+player.interactBlock(x,y,z,"up",x,y-1,z,false);
+}
+
+fun matchExistingBlock(x,y,z,itemString,direction,slabTop, extended){
+block = world.getBlockAt(x,y,z);
+slabTopVal = "bottom";
+if (slabTop) {slabTopVal = "top";} 
+if (block.getId().containsString(itemString)) {
+	map = block.getBlockProperties();
+	if (map.getKeys().contains("type") && map.get("type") != slabTopVal) {return false;}
+	if (direction != null && map.getKeys().contains("facing") && map.get("facing") != direction) {return false;}
+	if (extended != null && map.getKeys().contains(" extended") && map.get(" extended") !=  extended) {return false;}
+	return true;
+}
+return false;
+}
+fun setFakeRequiredYawPitchDirection(itemString, direction, duration){
+	if (direction == null) {direction = "NORTH";}
+	dir = direction.uppercase();
+	lookRefdir = dir;
+	if (itemString.containsString("piston")){
+		lookRefdir = getReverse(dir);
+	}
+	fy = player.getYaw();
+	fp = player.getPitch();
+	if (lookRefdir  == "UP") {
+		fy = 0;
+		fp = -90; 
+	}
+	if (lookRefdir  == "DOWN") {
+		fy = 0;
+		fp = 90; 
+	}
+	if (lookRefdir  == "EAST") {
+		fy = -90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "WEST") {
+		fy = 90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "NORTH") {
+		fy = 180;
+		fp = 0; 
+	}
+	if (lookRefdir  == "SOUTH") {
+		fy = 0;
+		fp = 0; 
+	}
+	player.fakeLook(fy,fp,lookRefdir,duration);
+	sleep(100);
+}
+fun breakReplaceDirectionBlock(x,y,z,itemString,dummyslot,direction, slabTop, accurateBlockPlacement, breakExist, requireSneak, ignoreBlock){
+	if (breakExist && !matchExistingBlock(x,y,z,itemString,direction,slabTop,null)) {breakBlock(x,y,z,requireSneak);}
+	if (!ignoreBlock && !world.getBlockAt(x,y,z).isReplaceable()){return false;}
+	py = y;
+	if (slabTop) {py = py+0.9;} 
+	if (direction == null) {direction = "NORTH";}
+	dir = direction.uppercase();
+	lookRefdir = dir;
+	if (itemString.containsString("piston")){
+		lookRefdir = getReverse(dir);
+	}
+	fy = player.getYaw();
+	fp = player.getPitch();
+	if (lookRefdir  == "UP") {
+		fy = 0;
+		fp = -90; 
+	}
+	if (lookRefdir  == "DOWN") {
+		fy = 0;
+		fp = 90; 
+	}
+	if (lookRefdir  == "EAST") {
+		fy = -90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "WEST") {
+		fy = 90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "NORTH") {
+		fy = 180;
+		fp = 0; 
+	}
+	if (lookRefdir  == "SOUTH") {
+		fy = 0;
+		fp = 0; 
+	}
+	shouldSleepAfter = swapToItem(itemString, dummyslot);
+	if (shouldSleepAfter == null){return false;}
+	if (!accurateBlockPlacement || itemString.containsString("rail")) {
+		player.fakeLook(fy,fp,lookRefdir,2);
+		if (doSleep) {sleep(100);}
+		player.interactBlock(x,y,z,lookRefdir,x,py,z,false);
+	} else {
+		carpetVec = applyCarpetProtocol(x,y,z,direction);
+		hx = carpetVec.getIndex(0);
+		hy = carpetVec.getIndex(1);
+		if (slabTop) {hx = hx+32;}
+		hz = carpetVec.getIndex(2);
+		player.interactBlock(hx,hy,hz,direction,x,py,z,false);
+	}
+	return shouldSleepAfter;
+}
+fun breakReplaceDirectionBlockForceNosleep(x,y,z,itemString,dummyslot,direction, slabTop, accurateBlockPlacement, breakExist, requireSneak, ignoreBlock){
+	if (breakExist && !matchExistingBlock(x,y,z,itemString,direction,slabTop,null)) {breakBlock(x,y,z,requireSneak);}
+	if (!ignoreBlock && !world.getBlockAt(x,y,z).isReplaceable()){return false;}
+	py = y;
+	if (slabTop) {py = py+0.9;} 
+	if (direction == null) {direction = "NORTH";}
+	dir = direction.uppercase();
+	lookRefdir = dir;
+	if (itemString.containsString("piston")){
+		lookRefdir = getReverse(dir);
+	}
+	fy = player.getYaw();
+	fp = player.getPitch();
+	if (lookRefdir  == "UP") {
+		fy = 0;
+		fp = -90; 
+	}
+	if (lookRefdir  == "DOWN") {
+		fy = 0;
+		fp = 90; 
+	}
+	if (lookRefdir  == "EAST") {
+		fy = -90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "WEST") {
+		fy = 90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "NORTH") {
+		fy = 180;
+		fp = 0; 
+	}
+	if (lookRefdir  == "SOUTH") {
+		fy = 0;
+		fp = 0; 
+	}
+	shouldSleepAfter = swapToItem(itemString, dummyslot);
+	if (shouldSleepAfter == null){return false;}
+	if (!accurateBlockPlacement || itemString.containsString("rail")) {
+		player.fakeLook(fy,fp,lookRefdir,2);
+		player.interactBlock(x,y,z,lookRefdir,x,py,z,false);
+	} else {
+		carpetVec = applyCarpetProtocol(x,y,z,direction);
+		hx = carpetVec.getIndex(0);
+		hy = carpetVec.getIndex(1);
+		if (slabTop) {hx = hx+32;}
+		hz = carpetVec.getIndex(2);
+		player.interactBlock(hx,hy,hz,direction,x,py,z,false);
+	}
+	return shouldSleepAfter;
+}
+fun offset(blockPos, addPos){
+bx = blockPos.getIndex(0) + addPos.getIndex(0);
+by = blockPos.getIndex(1) + addPos.getIndex(1);
+bz = blockPos.getIndex(2) + addPos.getIndex(2);
+return [bx,by,bz];
+}
+
+//safer place function
+fun place(blockPos, itemMapId, direction, addVec){
+	if (doSleep) {sleep(sleepAmount);}
+	blockPos = offset(blockPos, addVec);
+	sleepBool = breakReplaceDirectionBlock(blockPos.getIndex(0), blockPos.getIndex(1), blockPos.getIndex(2),mapBlockRef.get(itemMapId),itemMapId,direction,mapPropertyRef.get(itemMapId), accurateBlockPlacementEnabled,replace,false,false);
+	if (sleepBool){sleep(sleepAmount);}
+}
+
+
+
+fun slice1(dir, Pos){
+//west
+place(Pos, 1, null, [0,0,0]);
+place(Pos, 1, null, [0,0,-1]);
+place(Pos, 1, null, [0,1,0]);
+place(Pos, 1, null, [0,0,1]);
+place(Pos, 2, "west", [0,1,1]);
+place(Pos, 2, "east", [0,1,-1]);
+place(Pos, 3, null, [0,1,2]);
+place(Pos, 3, null, [0,1,-2]);
+place(Pos, 1, null, [0,2,2]);
+place(Pos, 1, null, [0,2,-2]);
+place(Pos, 4, "south", [0,2,1]);
+place(Pos, 4, "south", [0,2,0]);
+place(Pos, 6, null, [1,2,1]);
+place(Pos, 6, null, [0,3,1]);
+place(Pos, 6, null, [0,3,-1]);
+place(Pos, 6, null, [0,3,2]);
+place(Pos, 6, null, [0,3,-2]);
+}
+
+
+fun slice2(dir, Pos){
+place(Pos, 1, null, [0,0,0]);
+place(Pos, 1, null, [0,0,-1]);
+place(Pos, 1, null, [0,0,1]);
+place(Pos, 1, null, [0,1,-2]);
+place(Pos, 1, null, [0,1,2]);
+place(Pos, 7, null, [0,1,-1]);
+place(Pos, 4, "south", [0,2,-1]);
+place(Pos, 4, "south", [0,1,0]);
+place(Pos, 6, null, [0,1,1]);
+place(Pos, 5, "east", [0,2,-2]);
+place(Pos, 5, "west", [0,2,2]);
+place(Pos, 8, null, [1,2,1]);
+}
+
+fun slice3(dir, Pos){
+place(Pos, 1, null, [0,0,0]);
+place(Pos, 1, null, [0,0,-1]);
+place(Pos, 1, null, [0,0,1]);
+place(Pos, 4,  "south", [0,1,1]);
+place(Pos, 4,  "south", [0,1,0]);
+place(Pos, 2,  "west", [0,2,1]);
+place(Pos, 2,  "east", [0,2,-1]);
+place(Pos, 1, null, [0,2,2]);
+place(Pos, 1, null, [0,2,-2]);
+place(Pos, 6, null, [0,3,1]);
+place(Pos, 6, null, [0,3,-1]);
+place(Pos, 6, null, [0,3,2]);
+place(Pos, 6, null, [0,3,-2]);
+place(Pos, 6, null, [1,2,-1]);
+}
+
+
+fun slice4(dir,Pos){
+place(Pos, 1, null, [0,0,0]);
+place(Pos, 1, null, [0,0,-1]);
+place(Pos, 1, null, [0,0,1]);
+place(Pos, 1, null, [0,1,-2]);
+place(Pos, 1, null, [0,1,2]);
+place(Pos, 7, null, [0,1,1]);
+place(Pos, 4, "south", [0,2,1]);
+place(Pos, 4, "south", [0,1,0]);
+place(Pos, 6, null, [0,1,-1]);
+place(Pos, 5, "east", [0,2,-2]);
+place(Pos, 5, "west", [0,2,2]);
+place(Pos, 8, null, [1,1,1]);
+
+}
+
+fun walk(distance, yaw, pitch){
+	ex = player.getX();
+	ez = player.getZ();
+	while ( (ex - player.getX())^2 + (ez - player.getZ())^2 < distance^2) {
+		player.look(yaw,pitch);
+		player.setWalking(true);
+		sleep(10);
+	}
+	player.setWalking(false);
+}
+fun walkTo(toward, distance){
+	ex = toward.getIndex(0);
+	ey = toward.getIndex(1);
+	ez = toward.getIndex(2);
+	while ( (ex - player.getX())^2 + (ez - player.getZ())^2 > distance^2) {
+		player.lookAtPos(ex, ey, ez);
+		player.setWalking(true);
+		sleep(50);
+	}
+	sleep(25);
+	player.setWalking(false);
+}
+
+
+
+fun placeBreaking(ox,oy,oz,direction, headless, PistonType, SupportBlock){
+usedBlockPosL = [];
+vec = getConvertedPistonVec(direction);
+vx = vec.getIndex(0);
+vy = vec.getIndex(1);
+vz = vec.getIndex(2);
+breakReplaceDirectionBlock(ox+vx,oy+vy,oz+vz,PistonType,3,"up", false,accurateBlockPlacementEnabled,true,false,false);
+usedBlockPosL.append([ox+vx,oy+vy,oz+vz]);
+if (!accurateBlockPlacementEnabled){sleep(100);}
+if (headless && world.getBlockAt(ox,oy,oz).getHardness() != -1) {
+breakReplaceDirectionBlock(ox,oy,oz,"obsidian",4,null, false,accurateBlockPlacementEnabled,true,false,false);
+usedBlockPosL.append([ox,oy,oz]);
+}
+if (!accurateBlockPlacementEnabled){sleep(100);}
+torchSupportBool = world.getBlockAt(ox+2*vx,oy-1,oz+2*vz).isReplaceable();
+breakReplaceDirectionBlock(ox+2*vx,oy-1,oz+2*vz,SupportBlock,8,null,false,false, true,false,false);
+if(torchSupportBool) {sleep(50);usedBlockPosL.append([ox+2*vx,oy-1,oz+2*vz]);}
+if (!accurateBlockPlacementEnabled){sleep(100);}
+placeTorch(ox+2*vx,oy,oz+2*vz,7,false);
+usedBlockPosL.append([ox+2*vx,oy,oz+2*vz]);
+return usedBlockPosL;
+}
+fun processBreaking(ox,oy,oz,direction,headless, PistonType){
+vec = getConvertedPistonVec(direction);
+vx = vec.getIndex(0);
+vy = 0;
+vz = vec.getIndex(2);
+swapToPickaxe();
+dir = direction;
+player.attackBlock(ox+2*vx,oy,oz+2*vz,"up");
+player.attackBlock(ox+vx,oy,oz+vz,"up");
+if (headless) {placeTorch(ox+2*vx,oy,oz+2*vz,7,false);}
+breakReplaceDirectionBlockForceNosleep(ox+vx,oy,oz+vz,PistonType,3,dir, false,accurateBlockPlacementEnabled ,false,false,true);
+}
+
+fun getRequiredPositionsIsEmpty(ox,oy,oz,direction){
+usedBlockPosLb = [];
+if (direction =="up" || direction == "down"){
+
+null;
+}
+vec = getConvertedPistonVec(direction);
+vx = vec.getIndex(0);
+vy = vec.getIndex(1);
+vz = vec.getIndex(2);
+usedBlockPosLb.append([ox+vx,oy+vy,oz+vz]);
+if (world.getBlockAt(ox+2*vx,oy-1,oz+2*vz).isReplaceable()) {usedBlockPosLb.append([ox+2*vx,oy-1,oz+2*vz]);}
+usedBlockPosLb.append([ox+2*vx,oy,oz+2*vz]);
+
+foreach (requiredPositions : usedBlockPosLb){
+if (!world.getBlockAt(requiredPositions).isReplaceable()){return false;}
+}
+return true;
+}
+
+fun makeHeadlessPistonAtHeadpos(X,Y,Z,direction, headless, PistonType, SupportBlock){
+
+if (direction == "up" || direction == "down") {
+
+null;
+;}
+usedPoses = [];
+if (!accurateBlockPlacementEnabled) {setFakeRequiredYawPitchDirection("piston", "up", 5);}
+usedPoses = placeBreaking(X,Y,Z,direction, headless, PistonType, SupportBlock);
+sleep(250);
+if (!accurateBlockPlacementEnabled) {setFakeRequiredYawPitchDirection("piston", direction, 5);}
+processBreaking(X,Y,Z,direction,headless, PistonType);
+sleep(50);
+if (!headless) {
+foreach(blockIxyz : usedPoses){
+breakBlock(blockIxyz.getIndex(0), blockIxyz.getIndex(1),blockIxyz.getIndex(2),false);
+}
+}
+}
+
+
+i = 0;
+fun getIterator(start, end, num){
+ii = 0;
+maxlen = 1000;
+ret = [];
+c = start;
+while (c < end && ii < maxlen){
+ret.append(c);
+c = c+num;
+ii = ii+1;
+}
+return ret;
+}
+
+
+fun placeSponges(reach){
+sx = player.getX();
+sy = player.getY();
+sz = player.getZ();
+SxL = getIterator(sx-reach, sx+reach, 1);
+SyL = getIterator(sy-reach, sy+reach, 1);
+SzL = getIterator(sz-reach, sz+reach, 1);
+foreach (Sx : SxL) {
+foreach (Sy : SyL ) {
+foreach (Sz : SzL) {
+if (world.getBlockAt(Sx,Sy,Sz).getId().containsString("water")){
+breakReplaceDirectionBlock(Sx,Sy,Sz,"slime_block",5,null, false, false, false, false,false);
+sleep(10);
+}
+}
+}
+}
+}
+
+
+
+startRef = [341,5,387];
+startP = [player.getX(), player.getY()+1.5, player.getZ()];
+J=0;
+while (J<0){
+slice1("west",offset(startRef, [-J,0,0]));	
+walkTo(offset(startP, [-J-1,0,0]), 0.2);
+sleep(150);
+slice2("west",offset(startRef,[-(J+1),0,0]));
+walkTo(offset(startP, [-J-2,0,0]),0.2);
+sleep(150);
+slice3("west",offset(startRef,[-(J+2),0,0]));
+walkTo(offset(startP, [-J-3,0,0]),0.2);
+sleep(150);
+slice4("west",offset(startRef,[-(J+3),0,0]));
+walkTo(offset(startP, [-J-4,0,0]), 0.2);
+sleep(150);
+J=J+4;
+}
+
+fun fill(aX,aY,aZ,bX,bY,bZ){
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+aZL = getIterator(aZ,bZ,1);
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+if(world.isAir(aXi,aYi,aZi)){
+player.interactBlock(aXi,aYi,aZi,"up",aXi,aYi,aZi,false);
+sleep(100);}
+
+}
+}
+}
+}
+
+fun message(stringMessage){
+player.messageActionBar(stringMessage);
+sleep(500);
+}
+pos = player.getLookingAtBlock();
+//makeHeadlessPistonAtHeadpos(pos.getBlockX(),pos.getBlockY(),pos.getBlockZ(),"west", false, "sticky_piston", "slime_block");
+//breakReplaceDirectionBlockForceNosleep(pos.getX(),pos.getY()+1,pos.getZ(),"sticky_piston",0,"west",false, false,false,false,false);
+
+
+
+
+fun offsetDirection(posList, direction){
+ return offset( posList,getConvertedPistonVec(getReverse(direction)));
+}
+
+fun placeTorchWithFacing(posList, facing){
+if (facing == "up" || facing == "down" ){return placeTorch(posList.getIndex(0),posList.getIndex(1),posList.getIndex(2),0,true);}
+else {
+	clickPos = offsetDirection(posList, getReverse(facing));
+	if (world.getBlockAt(clickPos.getIndex(0),clickPos.getIndex(1),clickPos.getIndex(2)).sideCoversSmallSquare(facing)) {swapToItem("redstone_torch", 0); player.interactBlock( posList.getIndex(0),posList.getIndex(1),posList.getIndex(2),facing,clickPos.getIndex(0),clickPos.getIndex(1),clickPos.getIndex(2),false);}
+}
+}
+
+fun placePistonWithFacing(posList, direction, itemString, accurate){
+x = posList.getIndex(0);
+y = posList.getIndex(1);
+z = posList.getIndex(2);
+	if (direction == null) {direction = "NORTH";}
+	dir = direction.uppercase();
+	lookRefdir = dir;
+	if (itemString.containsString("piston")){
+		lookRefdir = getReverse(dir);
+	}
+	fy = player.getYaw();
+	fp = player.getPitch();
+	if (lookRefdir  == "UP") {
+		fy = 0;
+		fp = -90; 
+	}
+	if (lookRefdir  == "DOWN") {
+		fy = 0;
+		fp = 90; 
+	}
+	if (lookRefdir  == "EAST") {
+		fy = -90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "WEST") {
+		fy = 90;
+		fp = 0; 
+	}
+	if (lookRefdir  == "NORTH") {
+		fy = 180;
+		fp = 0; 
+	}
+	if (lookRefdir  == "SOUTH") {
+		fy = 0;
+		fp = 0; 
+	}
+	shouldSleepAfter = swapToItem(itemString, 0);
+	if (shouldSleepAfter == null){return false;}
+	if (!accurate) {
+		player.fakeLook(fy,fp,lookRefdir,2);
+		player.interactBlock(x,y,z,lookRefdir,x,y,z,false);
+		return shouldSleepAfter;
+	} else {
+		carpetVec = applyCarpetProtocol(x,y,z,direction);
+		hx = carpetVec.getIndex(0);
+		hy = carpetVec.getIndex(1);
+		hz = carpetVec.getIndex(2);
+		player.interactBlock(hx,hy,hz,direction,x,y,z,false);
+	}
+	return true;
+
+}
+
+
+fun canPlaceTorchAt(posList, facing){
+x = posList.getIndex(0);
+y = posList.getIndex(1);
+z = posList.getIndex(2);
+if(!world.getBlockAt(x,y,z).isReplaceable()){return false;}
+if (facing == "up" || facing == "down" ) {return world.getBlockAt(x,y-1,z).sideCoversSmallSquare("up");}
+else { 
+	clickPos = offsetDirection(posList, getReverse(facing));
+	return world.getBlockAt(clickPos.getIndex(0),clickPos.getIndex(1),clickPos.getIndex(2)).sideCoversSmallSquare(facing);
+}
+}
+
+
+fun willPowerPiston(posTorch, faceTorch, posPiston, facePiston){
+	if (offsetDirection(posPiston, facePiston) == posTorch) {return false;}
+	if( offsetDirection(posTorch, getReverse(faceTorch)) == posPiston || offsetDirection(posTorch, getReverse(faceTorch)) == offset(posPiston,[0,1,0])) {return false;}
+	if(offset(posPiston, [0,1,0]) == posTorch) {return false;}
+	if (facePiston.uppercase() == "DOWN") {
+		foreach (directions : ["north", "west", "east", "west"]){
+				foreach(offsets : [0,1]){
+					off = offset(offsetDirection(posPiston, directions), [0,offsets,0]);
+					if(off == posTorch) {return true;}
+				}
+		}
+	}
+	if(offset(posPiston, [0,-1,0]) == posTorch) {return true;}
+	if (facePiston.uppercase() == "UP") {
+		foreach (directions : ["north", "west", "east", "west"]){
+				foreach(offsets : [0,1]){
+					off = offset(offsetDirection(posPiston, directions), [0,offsets,0]);
+					if(off == posTorch) {return true;}
+				}
+		}
+	}
+	foreach (directions : ["north", "south", "east", "west"]){
+		foreach(offsets : [0,1]){
+			if(offsets == 0 && directions == facePiston) {return false;}
+			off = offset(offsetDirection(posPiston, directions), [0,offsets,0]);
+			if(off == posTorch) {return true;}
+		}
+	}
+	return false;
+}
+
+fun canExtend(posPiston, facePiston){
+	clickPosb = offsetDirection(posPiston, facePiston);
+	return  world.getBlockAt(clickPosb.getIndex(0),clickPosb.getIndex(1),clickPosb.getIndex(2)).isReplaceable();
+}
+
+fun getHorizontalQcCheck(startPos, restrictedDirection){
+	if(canPlaceTorchAt(startPos, "down")) {return [startPos,"down"];}
+	foreach (directionsB : ["north", "south", "east", "west"]){
+		foreach(offB : [0,1]){
+			offPos = offset(startPos, [0,offB,0]);
+			if(restrictedDirection.lowercase() == directionsB) {continue;}
+			torchAble = canPlaceTorchAt(offPos, directionsB);
+			if(torchAble) {
+				return [offPos, directionsB];}
+			}
+	}
+	return false;
+}
+fun verifyPiston(posPiston, facePiston){
+//return tweaked initial facing, torch position and torch facing
+	foreach (pistdirections : ["north","south","east","west", "up", "down"]){ 
+		if(pistdirections == facePiston.lowercase() || !canExtend(posPiston, pistdirections)) {continue;}
+	
+	foreach (directions : ["north","south","east","west"]){ 
+		if(pistdirections == directions) {continue;}
+		torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, directions),pistdirections);
+		if(torchAbleOffL != false && torchAbleOffL.getIndex(0) != posPiston) {
+			return [pistdirections, torchAbleOffL.getIndex(0), torchAbleOffL.getIndex(1)];
+		}
+		if(facePiston.lowercase() != "down"){
+			torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, "down"), "");
+			if(torchAbleOffL != false&& torchAbleOffL.getIndex(0) != posPiston) {
+				return [pistdirections, torchAbleOffL.getIndex(0), torchAbleOffL.getIndex(1)];
+			}
+		}
+	}
+	}
+	return false;
+}
+
+fun placeAsCalculated(posPiston, facePiston,itemString, accurate){
+ver = verifyPiston(posPiston, facePiston);
+if (ver == false) {return false;}
+placePistonWithFacing(posPiston, ver.getIndex(0), itemString, accurate);
+placeTorchWithFacing(ver.getIndex(1), ver.getIndex(2));
+return ver;
+}
+
+fun breakAsCalculated(posPiston, facePiston,itemString, accurate, headless,sleepTick){
+torchPosDir =  placeAsCalculated(posPiston, facePiston,itemString, accurate);
+sleep(sleepTick*50);
+if(torchPosDir == false) {return false;}
+swapToPickaxe();
+torchPos = torchPosDir.getIndex(1);
+tx = torchPos.getIndex(0);
+ty = torchPos.getIndex(1);
+tz = torchPos.getIndex(2);
+player.attackBlock(tx,ty,tz,"up");
+player.attackBlock(posPiston.getIndex(0),posPiston.getIndex(1),posPiston.getIndex(2),"up");
+placePistonWithFacing(posPiston, facePiston, itemString, accurate);
+if (headless) {placeTorchWithFacing(torchPosDir.getIndex(1), torchPosDir.getIndex(2));}
+}
+message(breakAsCalculated([-55,66,-12],"east","sticky_piston",false,false,3));
+
