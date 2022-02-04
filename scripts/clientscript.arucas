@@ -7,6 +7,9 @@ replace = true;
 doSleep = true;
 sleepAmount = 100;
 
+Horizontal = ["east","west","north","south"];
+AllDirections = ["east","west","north","south","up","down"];
+TorchDirections = ["east","west","north","south","down"];
 mapBlockRef = {
 	1 : "white_concrete",
 	2 : "sticky_piston",
@@ -27,6 +30,23 @@ mapPropertyRef = {
 	7 : true,
 	8 : false
 };
+fun reverseList(iter){
+//pls sensei where's reverse iterator smh
+	iterSequence = len(iter) - 1;
+	retVal = [];
+	while (iterSequence >= 0){
+		retVal.append(iter.getIndex(iterSequence));
+		iterSequence = iterSequence - 1;
+	}
+	return retVal;
+}
+
+fun getBlock(bp){
+bpx = bp.getIndex(0);
+bpy = bp.getIndex(1);
+bpz = bp.getIndex(2);
+return world.getBlockAt(bpx,bpy,bpz).getId();
+}
 
 fun getConvertedPistonVec(direction){
 if (direction.uppercase() == "NORTH"){
@@ -63,7 +83,9 @@ if (dir == "SOUTH") {
 return "NORTH";
 }
 }
-
+fun getBlockPos(block){
+return [block.getX(), block.getY(), block.getZ()];
+}
 fun getDirectionId(dir) {
 dir = dir.uppercase();
 if (dir == "UP") {
@@ -86,7 +108,13 @@ return 3;
 }
 }
 
-
+fun toolSwitch(blockPos){
+shovel = client.itemFromString("netherite_shovel").getMiningSpeedMultiplier(world.getBlockAt(blockPos.getIndex(0),blockPos.getIndex(1),blockPos.getIndex(2)));
+if(shovel > 1) {return "netherite_shovel";}
+pick =  client.itemFromString("netherite_pickaxe").getMiningSpeedMultiplier(world.getBlockAt(blockPos.getIndex(0),blockPos.getIndex(1),blockPos.getIndex(2)));
+if(pick > 1) {return "netherite_pickaxe";}
+return "netherite_pickaxe";
+}
 fun convertHotbarIndexToSlot(ind){
 if (ind == 0){return 46;}
 if (ind < 9) {return ind.modulus(9)+36;}
@@ -130,6 +158,12 @@ fun swapToItem(itemString, dummySlot){
 	if (itemString == "air") {
 		swapToPickaxe();
 		return false;}
+	foreach(i : [0,1,2,3,4,5,6,7,8]){
+		if(player.getItemForPlayerSlot(i).getId() == itemString){
+			player.setSelectedSlot(i);
+			return false;
+		}
+	}
 	slot = player.getSlotFor(client.itemFromString(itemString));
 	retVal = false;
 	if (slot == null) {return false;}
@@ -157,13 +191,16 @@ return true;
 fun breakBlock(x,y,z, requireSneak){
 	if (world.getBlockAt(x,y,z).getHardness() == -1 || world.getBlockAt(x,y,z).isFluid() || world.isAir(x,y,z)) {return;}
 	if (world.getBlockAt(x,y,z).getHardness() == 0) {breakBlockInstant(x,y,z,requireSneak);sleep(20);return;}
-	if (!world.getBlockAt(x,y,z).isReplaceable() ) {swapToPickaxe();}
+	if (!world.getBlockAt(x,y,z).isReplaceable() ) {
+	requiredTool = toolSwitch([x,y,z]);
+	swapResult = swapToItem(requiredTool,0);
+	if(swapResult == false){swapToPickaxe();}
 	while(!world.getBlockAt(x,y,z).isReplaceable()) {
 		if (requireSneak) {player.setSneaking(true);}
 		player.updateBreakingBlock(x,y,z);
+		if(world.getBlockAt(x,y,z).isReplaceable()){break;}
 		sleep(50);
-	}
-	sleep(100);
+	}}
 }
 
 fun applyCarpetProtocol(x,y,z,direction){
@@ -525,11 +562,11 @@ i = 0;
 fun getIterator(start, end, num){
 ii = 0;
 maxlen = 1000;
-ret = [];
+ret = [start];
 c = start;
 while (c < end && ii < maxlen){
-ret.append(c);
 c = c+num;
+ret.append(c);
 ii = ii+1;
 }
 return ret;
@@ -585,7 +622,52 @@ foreach (aYi : aYL) {
 foreach (aZi : aZL) {
 if(world.isAir(aXi,aYi,aZi)){
 player.interactBlock(aXi,aYi,aZi,"up",aXi,aYi,aZi,false);
-sleep(100);}
+sleep(10);}
+
+}
+}
+}
+}
+
+fun fillFromTo(aP,bP){
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+bX = bP.getIndex(0);
+bY = bP.getIndex(1);
+bZ = bP.getIndex(2);
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+aZL = getIterator(aZ,bZ,1);
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+
+if(world.getBlockAt(aXi,aYi,aZi).isReplaceable()){
+
+player.interactBlock(aXi,aYi,aZi,"up",aXi,aYi,aZi,false);
+sleep(5);}
+
+}
+}
+}
+}
+fun attackFromTo(aP,bP){
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+bX = bP.getIndex(0);
+bY = bP.getIndex(1);
+bZ = bP.getIndex(2);
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+aZL = getIterator(aZ,bZ,1);
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+
+player.attackBlock(aXi,aYi,aZi,"up");
+sleep(5);
 
 }
 }
@@ -596,7 +678,7 @@ fun message(stringMessage){
 player.messageActionBar(stringMessage);
 sleep(500);
 }
-pos = player.getLookingAtBlock();
+
 //makeHeadlessPistonAtHeadpos(pos.getBlockX(),pos.getBlockY(),pos.getBlockZ(),"west", false, "sticky_piston", "slime_block");
 //breakReplaceDirectionBlockForceNosleep(pos.getX(),pos.getY()+1,pos.getZ(),"sticky_piston",0,"west",false, false,false,false,false);
 
@@ -605,6 +687,16 @@ pos = player.getLookingAtBlock();
 
 fun offsetDirection(posList, direction){
  return offset( posList,getConvertedPistonVec(getReverse(direction)));
+}
+
+fun offsetDirectionAmount(posList, direction, num){
+retVal = posList;
+iterCount = 0;
+while (iterCount<num){
+iterCount = iterCount+1;
+ retVal = offset( posList,getConvertedPistonVec(getReverse(direction)));
+}
+return retVal;
 }
 
 fun placeTorchWithFacing(posList, facing){
@@ -654,7 +746,7 @@ z = posList.getIndex(2);
 	shouldSleepAfter = swapToItem(itemString, 0);
 	if (shouldSleepAfter == null){return false;}
 	if (!accurate) {
-		player.fakeLook(fy,fp,lookRefdir,2);
+		//player.fakeLook(fy,fp,lookRefdir.lowercase(),2); does not work, has to work before placing
 		player.interactBlock(x,y,z,lookRefdir,x,y,z,false);
 		return shouldSleepAfter;
 	} else {
@@ -715,17 +807,17 @@ fun willPowerPiston(posTorch, faceTorch, posPiston, facePiston){
 
 fun canExtend(posPiston, facePiston){
 	clickPosb = offsetDirection(posPiston, facePiston);
-	return  world.getBlockAt(clickPosb.getIndex(0),clickPosb.getIndex(1),clickPosb.getIndex(2)).isReplaceable();
+	return  world.getBlockAt(posPiston.getIndex(0),posPiston.getIndex(1),posPiston.getIndex(2)).isReplaceable() && world.getBlockAt(clickPosb.getIndex(0),clickPosb.getIndex(1),clickPosb.getIndex(2)).isReplaceable();
 }
 
-fun getHorizontalQcCheck(startPos, restrictedDirection){
+fun getHorizontalQcCheck(startPos, restrictedDirection, pistonPos, pistonFacing){
 	if(canPlaceTorchAt(startPos, "down")) {return [startPos,"down"];}
 	foreach (directionsB : ["north", "south", "east", "west"]){
 		foreach(offB : [0,1]){
 			offPos = offset(startPos, [0,offB,0]);
 			if(restrictedDirection.lowercase() == directionsB) {continue;}
 			torchAble = canPlaceTorchAt(offPos, directionsB);
-			if(torchAble) {
+			if(torchAble && willPowerPiston(offPos, directionsB, pistonPos, pistonFacing)  && willPowerPiston(offPos, directionsB, pistonPos, restrictedDirection)) {
 				return [offPos, directionsB];}
 			}
 	}
@@ -736,14 +828,14 @@ fun verifyPiston(posPiston, facePiston){
 	foreach (pistdirections : ["north","south","east","west", "up", "down"]){ 
 		if(pistdirections == facePiston.lowercase() || !canExtend(posPiston, pistdirections)) {continue;}
 	
-	foreach (directions : ["north","south","east","west"]){ 
+	foreach (directions : ["north","south","east","west","up","down"]){ 
 		if(pistdirections == directions) {continue;}
-		torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, directions),pistdirections);
+		torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, directions),pistdirections,posPiston, facePiston);
 		if(torchAbleOffL != false && torchAbleOffL.getIndex(0) != posPiston) {
 			return [pistdirections, torchAbleOffL.getIndex(0), torchAbleOffL.getIndex(1)];
 		}
 		if(facePiston.lowercase() != "down"){
-			torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, "down"), "");
+			torchAbleOffL = getHorizontalQcCheck(offsetDirection(posPiston, "down"),"",posPiston, facePiston);
 			if(torchAbleOffL != false&& torchAbleOffL.getIndex(0) != posPiston) {
 				return [pistdirections, torchAbleOffL.getIndex(0), torchAbleOffL.getIndex(1)];
 			}
@@ -774,6 +866,741 @@ player.attackBlock(tx,ty,tz,"up");
 player.attackBlock(posPiston.getIndex(0),posPiston.getIndex(1),posPiston.getIndex(2),"up");
 placePistonWithFacing(posPiston, facePiston, itemString, accurate);
 if (headless) {placeTorchWithFacing(torchPosDir.getIndex(1), torchPosDir.getIndex(2));}
+return true;
 }
-message(breakAsCalculated([-55,66,-12],"east","sticky_piston",false,false,3));
 
+fun breakTarget(posTarget, itemString, accurate, headless,sleepTick){
+	foreach (pistOffsetdirections : ["north","south","east","west", "up", "down"]){ 
+		testPos = offsetDirection(posTarget, pistOffsetdirections);
+		testDir = getReverse(pistOffsetdirections).lowercase();
+		if(breakAsCalculated(testPos, testDir, itemString, accurate, headless,sleepTick)){
+			return testPos;}
+	}
+	return false;
+}
+
+
+fun canPlaceTorchAtReturnDirection(posList, restrict){
+x = posList.getIndex(0);
+y = posList.getIndex(1);
+z = posList.getIndex(2);
+foreach (facing : ["east","west","north","south","down"]){
+if(facing == restrict) {continue;}
+if(!world.getBlockAt(x,y,z).isReplaceable()){return false;}
+if (facing == "up" || facing == "down" ) {if( world.getBlockAt(x,y-1,z).sideCoversSmallSquare("up")) {return facing;}}
+else { 
+	clickPos = offsetDirection(posList, getReverse(facing));
+	if(world.getBlockAt(clickPos.getIndex(0),clickPos.getIndex(1),clickPos.getIndex(2)).sideCoversSmallSquare(facing)) {return facing;}
+}
+}
+return false;
+}
+fun isSolidBlock(posList){
+px = posList.getIndex(0);
+py = posList.getIndex(1);
+pz = posList.getIndex(2);
+return world.getBlockAt(px,py,pz).isSolidBlock();
+}
+fun isReplaceable(posList){
+px = posList.getIndex(0);
+py = posList.getIndex(1);
+pz = posList.getIndex(2);
+return world.getBlockAt(px,py,pz).isReplaceable();
+}
+fun getPistonTorchDown(startPos, finalFacing){
+	pistonPos = offsetDirection(startPos, getReverse(finalFacing));
+	foreach (primaryFacing : AllDirections){
+		if(primaryFacing == finalFacing || !canExtend(pistonPos, primaryFacing)){
+			continue;
+		}
+		torchPos = offsetDirection(startPos, "down");
+		torchDir = canPlaceTorchAtReturnDirection(torchPos,"");
+		if(torchDir!= false){
+			return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if (!isSolidBlock(solidPos) || solidBlockDir == primaryFacing){
+				continue;
+			}
+			torchPos = offsetDirection(solidPos, "down");
+			torchDir = canPlaceTorchAtReturnDirection(torchPos,"");
+			if(torchDir!= false){
+				return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+			}
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if(solidBlockDir == primaryFacing || !isReplaceable(solidPos)){
+				continue;
+			}
+			foreach (torchDir : TorchDirections){
+				if(solidBlockDir == torchDir) {continue;}
+				foreach (offsetIter : [0,1]){
+					torchPos =  offsetDirectionAmount(solidPos, "up", offsetIter);
+					torchDir = canPlaceTorchAtReturnDirection(torchPos,solidBlockDir);
+					if(torchDir!= false){
+						return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+					}
+				}
+			}
+			
+		}
+	}
+	return false;
+}
+fun getPistonTorchUp(startPos, finalFacing){
+	pistonPos = offsetDirection(startPos, getReverse(finalFacing));
+	torchPos = offsetDirection(startPos, "up");
+	torchDir = canPlaceTorchAtReturnDirection(torchPos, "down");
+	foreach (primaryFacing : AllDirections){
+		if(torchDir != false && canExtend(pistonPos, primaryFacing) && primaryFacing != finalFacing) {return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];}
+	}
+	foreach (primaryFacing : AllDirections){
+		if(primaryFacing == finalFacing || !canExtend(pistonPos, primaryFacing)){
+			continue;
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if (!isSolidBlock(solidPos) || solidBlockDir == primaryFacing){
+				continue;
+			}
+			torchPos = offsetDirection(solidPos, "down");
+			torchDir = canPlaceTorchAtReturnDirection(torchPos,"");
+			if(torchDir!= false){
+				return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+			}
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if(solidBlockDir == primaryFacing || !isReplaceable(solidPos)){
+				continue;
+			}
+			foreach (torchDir : TorchDirections){
+				if(solidBlockDir == torchDir) {continue;}
+				foreach (offsetIter : [0,1]){
+					torchPos =  offsetDirectionAmount(solidPos, "up", offsetIter);
+					torchDir = canPlaceTorchAtReturnDirection(torchPos,solidBlockDir);
+					if(torchDir!= false){
+						return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+					}
+				}
+			}
+			
+		}
+	}
+	return false;
+}
+fun getPistonTorchPosDir(startPos, finalFacing){
+	if(finalFacing.lowercase() == "down") {return getPistonTorchDown(startPos, "down");}
+	if(finalFacing.lowercase() == "up") {return getPistonTorchUp(startPos,  "up");}
+	pistonPos = offsetDirection(startPos, getReverse(finalFacing));
+	torchPos = offsetDirection(startPos,"up");
+	torchDir = "down";
+	foreach (primaryFacing: AllDirections) {
+		if(primaryFacing == "up") {continue;}
+		if(primaryFacing != finalFacing && canExtend(pistonPos, primaryFacing) && canPlaceTorchAt(torchPos,torchDir)) {return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];}
+	}
+	torchPos = offsetDirection(pistonPos,"up");
+	foreach (primaryFacing: AllDirections) {
+		if(primaryFacing == "up") {continue;}
+		torchDir = canPlaceTorchAtReturnDirection(torchPos,"down");
+		if(primaryFacing != finalFacing && canExtend(pistonPos, primaryFacing) && torchDir!=false ) {return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];}
+	}
+	foreach (primaryFacing : AllDirections){
+		if(primaryFacing == finalFacing || !canExtend(pistonPos, primaryFacing)){
+			continue;
+		}
+		torchPos = offsetDirection(pistonPos, "down");
+		torchDir = canPlaceTorchAtReturnDirection(torchPos,"");
+		if(torchDir!= false){
+			return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if (!isSolidBlock(solidPos) || solidBlockDir == primaryFacing){
+				continue;
+			}
+			torchPos = offsetDirection(solidPos, "down");
+			torchDir = canPlaceTorchAtReturnDirection(torchPos,"");
+			if(torchDir!= false){
+				return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+			}
+		}
+		foreach (solidBlockDir : Horizontal){
+			solidPos = offsetDirection(pistonPos, solidBlockDir);
+			if(solidBlockDir == primaryFacing || !isReplaceable(solidPos)){
+				continue;
+			}
+			foreach (torchDir : TorchDirections){
+				if(solidBlockDir == torchDir) {continue;}
+				foreach (offsetIter : [0,1]){
+					torchPos = offsetDirectionAmount(solidPos, "up", offsetIter);
+					torchDir = canPlaceTorchAtReturnDirection(torchPos,solidBlockDir);
+					if(torchDir!= false){
+						return [pistonPos, finalFacing, primaryFacing, torchPos, torchDir];	
+					}
+				}
+			}
+			
+		}
+	}
+	return false;
+}
+fun attackBlock(posList, dir){
+px = posList.getIndex(0);
+py = posList.getIndex(1);
+pz = posList.getIndex(2);
+player.attackBlock(px,py,pz,dir);
+}
+fun clearBlockList(posLists){
+i = 0;
+foreach(posList : posLists){
+ i = i+1;
+px = posList.getIndex(0);
+py = posList.getIndex(1);
+pz = posList.getIndex(2);
+player.attackBlock(px,py,pz,"up");
+if(i.modulus(16) == 0){sleep(50);}
+}
+}
+
+fun calcAvailableBreakingPiston(posTarget, itemString, accurate, headless,sleepTick, specifyDir, afterClean){
+	foreach (testFacing : AllDirections){
+		if(specifyDir != false) {if(specifyDir != getReverse(testFacing).lowercase()) {continue;}}
+		res = getPistonTorchPosDir(posTarget, getReverse(testFacing));
+		if(res != false) {
+			pistonPos = res.getIndex(0);
+			finalFacing = res.getIndex(1);
+			primaryFacing = res.getIndex(2);
+			torchPos = res.getIndex(3);
+			torchDir = res.getIndex(4);
+			if(!accurate) {setFakeRequiredYawPitchDirection(itemString, primaryFacing, sleepTick);
+			sleep(20);}
+			placePistonWithFacing(pistonPos, primaryFacing, itemString, accurate);
+			placeTorchWithFacing(torchPos, torchDir);
+			swapToPickaxe();
+			if(!accurate) {sleep(sleepTick*50 - 50);setFakeRequiredYawPitchDirection(itemString,finalFacing, sleepTick); sleep(50);}
+			else {sleep(sleepTick*50);}
+			//t p t p
+			attackBlock(torchPos,"up");
+			attackBlock(pistonPos,"up");
+			if (headless) {placeTorchWithFacing(torchPos, torchDir);}
+			placePistonWithFacing(pistonPos, finalFacing, itemString, accurate);
+			if(afterClean) {
+			sleep(55);
+			swapToPickaxe();
+			attackBlock(pistonPos,"up");
+			}
+			return pistonPos;
+		}
+	}
+	return false;
+
+}
+
+pos = player.getLookingAtBlock();
+//getBlockPos(pos);
+//message(breakTarget(getBlockPos(pos),"sticky_piston",true,false,3));
+
+//res = calcAvailableBreakingPiston(getBlockPos(pos), "sticky_piston",true,false,3, false,true);
+fun makePlatform(pos, radius){
+fillFromTo(offset(getBlockPos(pos),[- radius,0,- radius]),offset(getBlockPos(pos),[ radius,0, radius]));
+}
+fun makePlatform2(pos, radius){
+fillFromTo(offset(pos,[- radius,0,- radius]),offset(pos,[ radius,0, radius]));
+}
+//makePlatform(pos, 32);
+
+
+//fillFromTo([-5661, 137,1762],[-5661, 137,1795]);
+
+fun spruce(reach){
+sx = player.getX();
+sy = player.getY();
+sz = player.getZ();
+SxL = getIterator(sx-reach, sx+reach, 1);
+SyL = getIterator(sy-reach, sy+reach, 1);
+SzL = getIterator(sz-reach, sz+reach, 1);
+foreach (Sx : SxL) {
+foreach (Sy : SyL ) {
+foreach (Sz : SzL) {
+if(world.getBlockAt(Sx,Sy,Sz).getId() == "podzol" && world.getBlockAt(Sx+1,Sy,Sz).getId() == "podzol" && world.getBlockAt(Sx,Sy,Sz+1).getId() == "podzol" && world.getBlockAt(Sx+1,Sy,Sz+1).getId() == "podzol"){
+swapToItem("spruce_sapling",4);
+fillFromTo([Sx,Sy+1,Sz], [Sx+1,Sy+1,Sz+1]);
+return;
+}
+}
+}
+}
+}
+//while(true){
+//spruce(5);
+//sleep(1400);
+//}
+
+//placePistonWithFacing([8,5,-15], "west", "sticky_piston",true);
+fun withinReach(pX,pY,pZ,reach){
+return (player.getX() - pX)^2 + (player.getY() - pY)^2 + (player.getZ() - pZ)^2 < reach ^2;
+}
+
+fun getToolDurability(itemString){
+slot = player.getSlotFor(client.itemFromString(itemString));
+return player.getItemForSlot(slot).getDurability();
+}
+
+fun repair(itemString){
+if (getToolDurability(itemString) > 1900) {return;}
+//expect bottle at offhand
+sleep(50);
+if(player.getItemForSlot(45).getCount() == 0){
+throwRuntimeError("");  
+}
+swapToItem(itemString,0);
+while (getToolDurability(itemString) > 0 && getToolDurability(itemString) < 1905) {
+player.use("once");
+player.use("once");
+player.use("once"); //throw 3 at 1 tick
+sleep(50);
+}
+}
+fun fillWithNetherrack(pos){
+fillItem = "slime_block";
+if(world.getBlockAt(pos.getIndex(0),pos.getIndex(1),pos.getIndex(2)).isFluidSource()){
+swapToItem(fillItem,0);
+player.interactBlock(pos.getIndex(0),pos.getIndex(1),pos.getIndex(2),"up",pos.getIndex(0),pos.getIndex(1),pos.getIndex(2),false);
+sleep(5);
+}
+
+
+}
+
+fun findPistonUnexpected(pistonPosList){
+l = [];
+foreach(pistonPos : pistonPosList){
+foreach ( dir : AllDirections){
+if(getBlock(offsetDirection(pistonPos, dir)) == 'piston' && !pistonPosList.contains(offsetDirection(pistonPos, dir)) ){
+	l.append(offsetDirection(pistonPos, dir));
+}
+}}
+return l;
+}
+fun breakArea(aP,bP, itemString,accurate, useBasic, yReverse, reachDistance, sleepTick){
+player.setSneaking(true);
+sleep(150);
+pistonPosList = [];
+threshold = 8;
+sleepAfterClean = 15;
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+bX = bP.getIndex(0);
+bY = bP.getIndex(1);
+bZ = bP.getIndex(2);
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+if(yReverse) {aYL = reverseList(aYL);}
+aZL = getIterator(aZ,bZ,1);
+aXLb = getIterator(aX-4,bX+4,1);
+aYLb = getIterator(aY,bY,1);
+if(yReverse) {aYLb = reverseList(aYLb);}
+aZLb = getIterator(aZ-4,bZ+4,1);
+foreach (aXi : aXLb) {
+foreach (aYi : aYLb) {
+foreach (aZi : aZLb) {
+fillWithNetherrack([aXi,aYi,aZi]);
+if(world.getBlockAt(aXi,aYi,aZi).getId() == 'slime_block') {attackBlock([aXi,aYi,aZi],"down");}
+}
+}
+}
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+if(len(pistonPosList) > threshold){
+pistonPosListnew = findPistonUnexpected(pistonPosList);
+pistonPosList = pistonPosList.concat(pistonPosListnew);
+swapToPickaxe();
+clearBlockList(pistonPosList);
+pistonPosList = [];
+sleep(sleepAfterClean);
+}
+repair("netherite_pickaxe");
+repair("netherite_shovel");
+fillWithNetherrack([aXi,aYi,aZi]);
+if(!world.isAir(aXi,aYi,aZi) &&!world.getBlockAt(aXi,aYi,aZi).isReplaceable() && world.getBlockAt(aXi,aYi,aZi).getHardness() == -1){
+	if(!withinReach(aXi,aYi,aZi,reachDistance)){continue;}
+	
+	if (!useBasic) {
+		player.say(itemString);
+		result = calcAvailableBreakingPiston([aXi,aYi,aZi], itemString, accurate, false, sleepTick, false,true);
+		if(result!= false) {pistonPosList.append(result);sleep(25);}}
+	else {a = breakTarget([aXi,aYi,aZi],itemString,true,false,3);
+		if(a != false) {sleep(150);attackBlock(a,"down");}
+	}
+}
+else {
+	if(!world.isAir(aXi,aYi,aZi)){breakBlock(aXi,aYi,aZi,false);}
+}
+}
+}
+}
+}
+fun clearNether(p1,p2, yReverse, reachDistance,accurate, useBasic, sleepTick){
+i = 0;
+while (true){
+breakArea(p1,p2,"piston",accurate, useBasic, yReverse, reachDistance, sleepTick);
+world = client.getWorld();
+sleep(100);
+player.messageActionBar(i);
+i = i+1;
+if (i == 20) {
+break;}
+}
+}
+
+
+
+fun interactAction(aP){
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+player.interactBlock(aX,aY,aZ,"up",aX,aY,aZ,false);
+}
+
+fun iterateArea(aP,bP){
+ret = [];
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+bX = bP.getIndex(0);
+bY = bP.getIndex(1);
+bZ = bP.getIndex(2);
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+aZL = getIterator(aZ,bZ,1);
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+ret.append([aXi,aYi,aZi]);
+
+
+}
+}
+}
+return ret;
+}
+fun fillFromToPer(aP,bP,per){
+aX = aP.getIndex(0);
+aY = aP.getIndex(1);
+aZ = aP.getIndex(2);
+bX = bP.getIndex(0);
+bY = bP.getIndex(1);
+bZ = bP.getIndex(2);
+aXL = getIterator(aX,bX,1);
+aYL = getIterator(aY,bY,1);
+aZL = getIterator(aZ,bZ,1);
+i=0;
+foreach (aXi : aXL) {
+foreach (aYi : aYL) {
+foreach (aZi : aZL) {
+i=i +1;
+if(world.getBlockAt(aXi,aYi,aZi).isReplaceable()){
+if (i.modulus(per) == 0){
+player.interactBlock(aXi,aYi,aZi,"up",aXi,aYi,aZi,false);
+sleep(5);}}
+
+}
+}
+}
+}
+
+
+
+leverPos = [203,43,528];
+buttonPos = [201,46,528];
+stonecutterAt = [201,47,528];
+
+fun resetJob(stationPos){
+	breakBlock(stationPos.getIndex(0), stationPos.getIndex(1), stationPos.getIndex(2), true);
+	sleep(20);
+	swapToItem("stonecutter",0);
+	sleep(20);
+	player.interactBlock(stationPos.getIndex(0), stationPos.getIndex(1), stationPos.getIndex(2),"down",stationPos.getIndex(0), stationPos.getIndex(1), stationPos.getIndex(2),false);
+}
+fun noVillagerWait(){
+		if(player.getSlotFor(client.itemFromString("emerald")) == null) {stop();}
+		allEntities = client.getWorld().getAllEntities();
+		foreach (entity : allEntities) {
+	   	 	if (entity.getId() == "villager" && player.getSquaredDistanceTo(entity) < 12) {
+	       		 return false;
+ 	  		 }
+		}
+		return true;
+
+}
+fun startInteract(){
+	while (player.getCurrentScreen() == null){
+		if(noVillagerWait()){stop();}
+		allEntities = client.getWorld().getAllEntities();
+		foreach (entity : allEntities) { 
+	   	 	if (entity.getId() == "villager" && player.getSquaredDistanceTo(entity) < 12) {
+	       		 player.interactWithEntity(entity);
+			sleep(100);
+			if(player.getCurrentScreen() != null){
+				break;}
+ 	  		 }
+		}
+	sleep(100);}
+}
+
+fun tradeOnce(itemString){
+	itemStack = client.itemFromString(itemString);
+	index = null;
+	try{
+	index = player.getIndexOfTradeItem(itemStack);
+	}
+	catch(error){
+	return;
+	}
+	if(index == null){
+	while (player.getCurrentScreen() != null){
+		player.closeScreen();
+	sleep(50);
+	}
+	return;
+	}
+	while (!player.isTradeSelected()){
+	player.selectTrade(index);
+	sleep(25);
+	}
+	while (!player.isTradeDisabled(index)){
+	player.tradeSelectedRecipeAndThrow();
+	sleep(5);
+	}
+	player.clearTrade();
+	while (player.getCurrentScreen() != null){
+		player.closeScreen();
+	sleep(50);
+	}
+}
+fun tradeWithoutInventory(index){
+	res = 0;
+	while (!player.isTradeDisabled(index)){
+	while (!player.isTradeDisabled(index) && !player.isTradeSelected()){
+	player.selectTrade(index);
+	sleep(50);
+	}
+	player.tradeSelectedRecipeAndThrow();
+	res = res+1;
+	sleep(2);
+	}
+	return res;
+}
+fun getTradeListMatches(itemString){
+	itemList = [];
+	tradeA=0;
+	try{
+		while(true){
+		item = player.getTradeItemForIndex(tradeA);
+		if (item.getId().containsString(itemString)) {
+			itemList.append(tradeA);
+		}
+		tradeA = tradeA+1;
+		}
+	}
+	catch(error){
+	return itemList;
+	}
+	return itemList;
+}
+fun tradeMatchString(itemString, useInv){
+	tradeL = getTradeListMatches(itemString);
+	res = 0;
+	foreach (idx : tradeL){
+		if (useInv) {player.tradeIndex(idx);} else {
+		res = res + tradeWithoutInventory(idx);}
+	}
+	player.clearTrade();
+//	sleep(50);
+	player.closeScreen();
+	return res;
+}
+
+
+fun pushButtonAndFindMinecart(buttonPos, leverPos){
+	//player.interactBlock(leverPos.getIndex(0), leverPos.getIndex(1), leverPos.getIndex(2),"down",leverPos.getIndex(0), leverPos.getIndex(1), leverPos.getIndex(2),false);
+	//sleep(150);
+	player.interactBlock(buttonPos.getIndex(0), buttonPos.getIndex(1), buttonPos.getIndex(2),"down",buttonPos.getIndex(0), buttonPos.getIndex(1), buttonPos.getIndex(2),false);
+	sleep(1000);
+	//player.interactBlock(leverPos.getIndex(0), leverPos.getIndex(1), leverPos.getIndex(2),"down",leverPos.getIndex(0), leverPos.getIndex(1), leverPos.getIndex(2),false);
+	//sleep(150);
+}
+
+while (false){
+resetJob(stonecutterAt);
+startInteract();
+sleep(200);
+ tradeOnce("brick");
+sleep(500);
+pushButtonAndFindMinecart(buttonPos, leverPos);
+sleep(5000);
+
+}
+
+fun getItemCount(itemString){
+try{
+	return player.getItemForSlot(player.getSlotFor(client.itemFromString(itemString))).getCount();}
+catch (exception) {return 0;}
+}
+fun getFullName(idx){
+	return player.getTradeItemForIndex(idx).getId();
+}
+fun tradeMatchStringOnlyOnce(itemString, mapModified){
+	tradeL = getTradeListMatches(itemString);
+	foreach (idx : tradeL){
+		fullName = getFullName(idx);
+		player.messageActionBar(fullName);
+		if(mapModified.getKeys().contains(fullName)){
+			continue;
+		}
+		mapModified.put(fullName, true);
+		if(getItemCount(fullName) != 0){continue;}
+		player.tradeIndex(idx);
+	}
+	sleep(50);
+	player.closeScreen();
+	return mapModified;
+}
+
+fun tradeMacro(){
+		allEntities = client.getWorld().getAllEntities();
+		foreach (entity : allEntities) { 
+	   	 	if (entity.getId() == "villager" && player.getSquaredDistanceTo(entity) < 12) {
+			while(player.getCurrentScreen() == null){
+	       		 player.interactWithEntity(entity);
+			sleep(50);
+			}
+			if(player.getCurrentScreen() != null){
+				tradeOnce("chiseled_stone_bricks");
+			sleep(50);}
+ 	  		 }
+		}
+}
+//tradeMacro();
+//calcAvailableBreakingPiston(getBlockPos(pos), "piston",true,false,3, false,true); //calcAvailableBreakingPiston(posTarget, itemString, accurate, headless,sleepTick, specifyDir, afterClean)
+//clearNether([0,127,480],[530,129,1010	],true, 400,true,false,1);
+fun tradeTerraCotta(){
+		allEntities = client.getWorld().getAllEntities();
+		m = 0;
+		t = player.getMilliTime();
+		while(true){
+		foreach (entity : allEntities) { 
+	   	 	if (entity.getId() == "villager" && player.getSquaredDistanceTo(entity) < 12) {
+			while(player.getCurrentScreen() == null){
+	       		 player.interactWithEntity(entity);
+			sleep(50);
+			}
+			if(player.getCurrentScreen() != null){
+				try{
+				m = m+ tradeMatchString("terracotta", false);
+				}
+				catch(e){
+				sleep(50);
+				continue;}
+			sleep(50);}
+ 	  		 }
+		}
+	//player.say( m / (player.getMilliTime() - t) * 1000);
+	sleep(50);
+	
+		}}
+
+fun throwEmptyShulkerbox(){
+	slots = player.getAllSlotsFor(client.itemFromString("shulker_box"));
+	foreach(Slots : slots){
+		try{
+			slotLen = len(player.getItemForSlot(Slots).getNbt().get("BlockEntityTag").get("Items"));
+			if(slotLen == 0){
+				player.clickSlot(Slots, 1, "throw");
+			};
+		}
+		catch (exception){
+				player.clickSlot(Slots, 1, "throw");
+		}
+	}
+
+}
+fun getEmptySlot(){
+//9~35
+	foreach (slots : player.getAllSlotsFor(client.itemFromString("air"))){
+		if(slots >8 && slots < 36) {
+			return slots;
+		}
+	}
+	return null;
+}
+fun hasSingleShulkerWithItem(itemString, amount){
+	count = 0;
+	slots = player.getAllSlotsFor(client.itemFromString("shulker_box"));
+	foreach(Slots : slots){
+		try{
+			shulker = player.getItemForSlot(Slots);
+			if(shulker.getCount() >1) {continue;}
+			shulkerItems = player.getItemForSlot(Slots).getNbt().get("BlockEntityTag").get("Items");
+			if(shulkerItems == null){continue;}
+			hasItem = false;
+			foreach(item : shulkerItems){
+				if(item.get("id").containsString(itemString)) {
+					hasItem = true;
+					break;
+				}	
+			}
+			if(hasItem) {count = count+1;}
+			if(count >= amount) {return true;}
+		}
+		catch (exception){
+			continue;
+		}
+	}
+	return false;
+}
+
+fun getStackedShulkerWithItem(itemString){
+	slots = player.getAllSlotsFor(client.itemFromString("shulker_box"));
+	foreach(Slots : slots){
+		try{
+			shulker = player.getItemForSlot(Slots);
+			if(shulker.getCount() ==1) {continue;}
+			shulkerItems = player.getItemForSlot(Slots).getNbt().get("BlockEntityTag").get("Items");
+			foreach(item : shulkerItems){
+				if(item.get("id").containsString(itemString)) {
+					return Slots;
+				}
+			}
+		}
+		catch (exception){
+			continue;
+		}
+	};
+	return -1;
+}
+fun processRefillPre(itemString){
+	throwEmptyShulkerbox();
+	if(!hasSingleShulkerWithItem(itemString,3)){
+		client.holdKey("y",200);
+		sleep(200);
+		unpackSlot = getStackedShulkerWithItem(itemString);
+		if(unpackSlot == -1) {stop();}
+		emptySlot = getEmptySlot();
+		if(emptySlot == null) {stop();}
+		player.clickSlot(unpackSlot, 1, "pickup");
+		player.clickSlot(emptySlot, 1, "pickup");
+		player.clickSlot(unpackSlot, 0, "pickup");
+		client.holdKey("y",200);
+		sleep(200);
+	}
+}
+//clearNether([0,127,0],[5,129,5],true, 4,false,false,1.5); //clearNether(p1,p2, yReverse, reachDistance,accurate, useBasic, sleepTick)
+
+calcAvailableBreakingPiston(getBlockPos(pos), "piston",false,false,1.3, false,true); //calcAvailableBreakingPiston(posTarget, itemString, accurate, headless,sleepTick, specifyDir, afterClean)
+//no accurateblockplacement = 1.3 is reliable maximum fastest speed in sp
